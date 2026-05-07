@@ -8,10 +8,16 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { useFonts } from 'expo-font';
 import TrackPlayer, { Capability } from 'react-native-track-player';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 // Import our screens
 import HomeScreen from './src/screens/HomeScreen';
 import ReaderScreen from './src/screens/ReaderScreen';
+import HukamnamaScreen from './src/screens/HukamnamaScreen';
+import LiveGurbaniScreen from './src/screens/LiveGurbaniScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
+import MeditationScreen from './src/screens/MeditationScreen';
+import { CustomDrawer } from './src/components/CustomDrawer';
 import { colors } from './src/theme/colors';
 
 const Stack = createNativeStackNavigator();
@@ -21,14 +27,25 @@ const Drawer = createDrawerNavigator();
 function DrawerNavigator() {
   return (
     <Drawer.Navigator 
+      // THIS IS THE MAGIC LINE: 
+      drawerContent={(props) => <CustomDrawer {...props} />}
       screenOptions={{ 
-        headerShown: false, // We hide the default header because we built a custom TopBar
-        drawerStyle: { backgroundColor: colors.background }, // Premium warm paper color
-        drawerActiveTintColor: colors.primary, // Saffron color for active item
+        headerShown: false, 
+        drawerActiveTintColor: colors.primary, 
+        drawerActiveBackgroundColor: colors.primaryLight, // Highlights the 'Home' button nicely
+        drawerLabelStyle: { fontSize: 16, fontWeight: 'bold' }
       }}
     >
-      {/* Home is the main screen inside the drawer */}
-      <Drawer.Screen name="Home" component={HomeScreen} options={{ title: 'Nitnem' }} />
+      <Drawer.Screen 
+        name="Home" 
+        component={HomeScreen} 
+        options={{ 
+          title: 'Home',
+          drawerIcon: ({ color }) => (
+            <MaterialCommunityIcons name="home-outline" size={24} color={color} />
+          )
+        }} 
+      />
     </Drawer.Navigator>
   );
 }
@@ -89,6 +106,28 @@ export default function App() {
           name="ReaderScreen" 
           component={ReaderScreen} 
           options={{ animation: 'slide_from_right' }} // Smooth premium transition
+        />
+
+        {/* NEW: Feature Screens */}
+        <Stack.Screen 
+          name="HukamnamaScreen" 
+          component={HukamnamaScreen} 
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen 
+          name="LiveGurbaniScreen" 
+          component={LiveGurbaniScreen} 
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen 
+          name="MeditationScreen" 
+          component={MeditationScreen} 
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen 
+          name="SettingsScreen" 
+          component={SettingsScreen} 
+          options={{ animation: 'slide_from_right' }}
         />
 
       </Stack.Navigator>

@@ -1,19 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, LayoutAnimation, Platform, UIManager, ActivityIndicator } from 'react-native';
+import { TopBar } from '../components/TopBar';
 import TrackPlayer from 'react-native-track-player';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { usePlayback } from '../hooks/usePlayback';
 import { colors } from '../theme/colors';
-
-// Import our local JSON data
-import japjiData from '../data/japji.json';
 import { AudioPlayer } from '../components/AudioPlayer';
-//import jaapData from '../data/jaap.json';
 
-// A dictionary to map the ID to the correct JSON data
-const dataMap: any = {
-    japji: japjiData,
-    // jaap: jaapData, 
+// A dictionary to map your route IDs to the official GurbaniNow API IDs
+const apiBaniIds: any = {
+    'japji': 1,
+    'jaap': 2,
+    'tavprasad': 3,
+    'choupai': 4,
+    'anand': 5,
+    'rehras': 8,
+    'kirtan': 9,
+    'ardaas': 10, 
 };
 
 // CRITICAL: This enables LayoutAnimation on Android for smooth sliding
@@ -21,16 +24,21 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-export default function ReaderScreen({ route }: any) {
+export default function ReaderScreen({ route, navigation }: any) {
     // Extract the ID sent from HomeScreen
     const { id, title } = route.params;
 
     const { isPlaying, playerState } = usePlayback();
 
-    // 1. Add state to track if player is visible
+    // 1. Existing state for player visibility
     const [showPlayer, setShowPlayer] = useState(true);
 
-    // 2. The function to toggle with a smooth sliding animation
+    // 2. New states for handling API data
+    const [baniData, setBaniData] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    // The function to toggle with a smooth sliding animation
     const togglePlayer = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setShowPlayer(!showPlayer);
@@ -39,12 +47,33 @@ export default function ReaderScreen({ route }: any) {
     useEffect(() => {
         let isMounted = true;
 
-        const setupTrack = async () => {
+        const initializeScreen = async () => {
             try {
-                // 1. Check current queue
+                // START: API FETCH LOGIC
+                setIsLoading(true);
+                const apiId = apiBaniIds[id];
+                const response = await fetch(`https://api.gurbaninow.com/v2/banis/${apiId}`);
+                
+                if (!response.ok) throw new Error("Failed to fetch Bani data");
+                
+                const json = await response.json();
+                
+                // Map the API's nested structure to our simple array structure
+                if (isMounted && json.bani) {
+                    const formattedData = json.bani.map((item: any, index: number) => ({
+                        id: String(index),
+                        // Using optional chaining (?.) to prevent crashes if a line is missing data
+                        gurmukhi: item.line.gurmukhi?.unicode || item.line.gurmukhi?.akhar || '',
+                        transliteration: item.line.transliteration?.english?.text || '',
+                        translation: item.line.translation?.english?.default || '',
+                    }));
+                    setBaniData(formattedData);
+                }
+                // END: API FETCH LOGIC
+
+                // START: YOUR EXISTING AUDIO SETUP LOGIC
                 const queue = await TrackPlayer.getQueue();
 
-                // 2. Only add the track if the queue is empty OR it's a different song
                 if (queue.length === 0 || queue[0].id !== id) {
                     console.log("Setting up new track...");
                     await TrackPlayer.reset();
@@ -55,33 +84,68 @@ export default function ReaderScreen({ route }: any) {
                         artist: 'Nitnem Sahib',
                     });
                 }
-            } catch (e) {
-                console.error("Setup error:", e);
+                // END: YOUR EXISTING AUDIO SETUP LOGIC
+
+            } catch (e: any) {
+                if (isMounted) setError(e.message);
+                console.error("Setup/Fetch error:", e);
+            } finally {
+                if (isMounted) setIsLoading(false);
             }
         };
 
-        setupTrack();
+        initializeScreen();
         return () => { isMounted = false; };
-    }, [id]); // ONLY re-run if the ID changes (e.g. user switches from Japji to Jaap)
-
-    // Select the correct data array based on the ID
-    const currentBaniData = dataMap[id];
+    }, [id]); // ONLY re-run if the ID changes
 
     // This function dictates how a single line of Gurbani looks
     const renderBaniLine = ({ item }: any) => (
         <View style={styles.lineContainer}>
             <Text style={styles.gurmukhiText}>{item.gurmukhi}</Text>
-            <Text style={styles.transliterationText}>{item.transliteration}</Text>
-            <Text style={styles.translationText}>{item.translation}</Text>
+            {/* Conditionally render transliteration/translation only if they exist for this line */}
+            {item.transliteration ? <Text style={styles.transliterationText}>{item.transliteration}</Text> : null}
+            {item.translation ? <Text style={styles.translationText}>{item.translation}</Text> : null}
         </View>
     );
 
+    // Show Loading Spinner while fetching data
+    if (isLoading) {
+        return (
+            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={{ marginTop: 10, color: colors.textMuted }}>Loading {title}...</Text>
+            </SafeAreaView>
+        );
+    }
+
+    // Show Error message if offline or API fails
+    if (error) {
+        return (
+            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <MaterialCommunityIcons name="wifi-off" size={40} color={colors.textMuted} />
+                <Text style={{ marginTop: 10, color: colors.textMuted }}>Unable to load Gurbani.</Text>
+                <Text style={{ fontSize: 12, color: 'red', marginTop: 5 }}>{error}</Text>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container}>
+            <TopBar 
+                title={title} 
+                isBack={true} 
+                onLeftPress={() => navigation.goBack()} 
+            />
+            
             <FlatList
-                data={currentBaniData}
+                // Pass the fetched state data here
+                data={baniData}
                 keyExtractor={(item) => item.id}
                 renderItem={renderBaniLine}
+                // Performance boosts for rendering large lists of text
+                initialNumToRender={15}
+                maxToRenderPerBatch={20}
+                windowSize={5}
                 // Dynamically adjust bottom padding so text doesn't hide behind the player
                 contentContainerStyle={[styles.listContent, { paddingBottom: showPlayer ? 240 : 100 }]}
             />
@@ -132,14 +196,14 @@ const styles = StyleSheet.create({
     },
     transliterationText: {
         fontSize: 16,
-        color: colors.text,
+        color: colors.textMain,
         textAlign: 'center',
         fontStyle: 'italic',
         marginBottom: 4,
     },
     translationText: {
         fontSize: 14,
-        color: '#666666', // A softer gray for the English translation
+        color: colors.textSub, // A softer gray for the English translation
         textAlign: 'center',
     },
     bottomPlayerContainer: {

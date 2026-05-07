@@ -9,18 +9,27 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FAF8F5"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ohlengr.nitnemsahib" 
+      "bundleIdentifier": "com.ohlengr.nitnemsahib",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#FAF8F5"
       },
-      "package": "com.ohlengr.nitnemsahib" 
+      "package": "com.ohlengr.nitnemsahib",
+      "permissions": [
+        "FOREGROUND_SERVICE",
+        "WAKE_LOCK"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

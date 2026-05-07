@@ -1,30 +1,48 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native'; // <-- NEW: Allows TopBar to navigate itself
 import { colors } from '../theme/colors';
 
 interface TopBarProps {
     title: string;
-    onMenuPress: () => void;
-    onSettingsPress?: () => void;
+    onLeftPress: () => void; 
+    isBack?: boolean;        
+    hideSettings?: boolean;  // NEW: Lets us hide the cog on the actual Settings screen
 }
 
-export const TopBar = ({ title, onMenuPress, onSettingsPress }: TopBarProps) => {
+export const TopBar = ({ title, onLeftPress, isBack = false, hideSettings = false }: TopBarProps) => {
+    
+    // Initialize the navigation hook
+    const navigation = useNavigation<any>(); 
+
     return (
         <SafeAreaView style={styles.safeArea}>
             <View style={styles.container}>
-                {/* Menu Button */}
-                <TouchableOpacity onPress={onMenuPress} style={styles.iconButton}>
-                    <MaterialCommunityIcons name="menu" size={28} color={colors.textMain} />
+                {/* Left Button (Menu or Back) */}
+                <TouchableOpacity onPress={onLeftPress} style={styles.iconButton}>
+                    <MaterialCommunityIcons 
+                        name={isBack ? "arrow-left" : "menu"} 
+                        size={28} 
+                        color={colors.textMain} 
+                    />
                 </TouchableOpacity>
 
                 {/* Title */}
                 <Text style={styles.title}>{title}</Text>
 
-                {/* Settings / Font Size Button */}
-                <TouchableOpacity onPress={onSettingsPress} style={styles.iconButton}>
-                    <MaterialCommunityIcons name="format-font-size-increase" size={26} color={colors.textMain} />
-                </TouchableOpacity>
+                {/* Right Button (Settings) */}
+                {hideSettings ? (
+                    // If we hide settings, render an invisible box to keep the title perfectly centered
+                    <View style={{ width: 42 }} /> 
+                ) : (
+                    <TouchableOpacity 
+                        onPress={() => navigation.navigate('SettingsScreen')} // <-- Hardcoded logic!
+                        style={styles.iconButton}
+                    >
+                        <MaterialCommunityIcons name="cog" size={26} color={colors.textMain} />
+                    </TouchableOpacity>
+                )}
             </View>
         </SafeAreaView>
     );
@@ -33,7 +51,6 @@ export const TopBar = ({ title, onMenuPress, onSettingsPress }: TopBarProps) => 
 const styles = StyleSheet.create({
     safeArea: {
         backgroundColor: colors.surface,
-        // Premium shadow for the header
         elevation: 4,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
@@ -55,9 +72,10 @@ const styles = StyleSheet.create({
         backgroundColor: colors.background,
     },
     title: {
-        fontSize: 20,
+        fontSize: 22, 
         fontWeight: 'bold',
-        color: colors.primary,
-        letterSpacing: 0.5,
+        color: colors.primary, 
+        fontFamily: 'GurbaniLipi', 
+        marginTop: 5, 
     }
 });
