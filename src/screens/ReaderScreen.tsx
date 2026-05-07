@@ -7,6 +7,8 @@ import { usePlayback } from '../hooks/usePlayback';
 import { colors } from '../theme/colors';
 import { AudioPlayer } from '../components/AudioPlayer';
 
+import { useSettingsStore } from '../store/useSettingsStore';
+
 // A dictionary to map your route IDs to the official GurbaniNow API IDs
 const apiBaniIds: any = {
     'japji': 1,
@@ -27,6 +29,9 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 export default function ReaderScreen({ route, navigation }: any) {
     // Extract the ID sent from HomeScreen
     const { id, title } = route.params;
+
+    // Pulling global settings from Zustand store
+    const { showEnglish, showTransliteration } = useSettingsStore();
 
     const { isPlaying, playerState } = usePlayback();
 
@@ -102,9 +107,15 @@ export default function ReaderScreen({ route, navigation }: any) {
     const renderBaniLine = ({ item }: any) => (
         <View style={styles.lineContainer}>
             <Text style={styles.gurmukhiText}>{item.gurmukhi}</Text>
-            {/* Conditionally render transliteration/translation only if they exist for this line */}
-            {item.transliteration ? <Text style={styles.transliterationText}>{item.transliteration}</Text> : null}
-            {item.translation ? <Text style={styles.translationText}>{item.translation}</Text> : null}
+            
+            {/* UPDATED: Only render if both the text exists AND the user's setting is toggled to true */}
+            {showTransliteration && item.transliteration ? (
+                <Text style={styles.transliterationText}>{item.transliteration}</Text>
+            ) : null}
+            
+            {showEnglish && item.translation ? (
+                <Text style={styles.translationText}>{item.translation}</Text>
+            ) : null}
         </View>
     );
 

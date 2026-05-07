@@ -1,15 +1,20 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, Switch, TouchableOpacity, ScrollView } from 'react-native';
 import { TopBar } from '../components/TopBar';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
+import { useSettingsStore } from '../store/useSettingsStore'; // <-- Import your store
 
 export default function SettingsScreen({ navigation }: any) {
-    // Note: Later, we will move these to a global state (like React Context or AsyncStorage) 
-    // so they actually update the text in your ReaderScreen!
-    const [showEnglish, setShowEnglish] = useState(true);
-    const [showTransliteration, setShowTransliteration] = useState(true);
-    const [darkMode, setDarkMode] = useState(false);
+    // 1. Hook into your global state instead of useState
+    const { 
+        showEnglish, 
+        toggleEnglish, 
+        showTransliteration, 
+        toggleTransliteration, 
+        darkMode, 
+        toggleDarkMode 
+    } = useSettingsStore();
 
     const SettingToggle = ({ icon, title, subtitle, value, onToggle }: any) => (
         <View style={styles.settingRow}>
@@ -41,12 +46,13 @@ export default function SettingsScreen({ navigation }: any) {
             <ScrollView style={styles.content}>
                 <Text style={styles.sectionHeader}>Reading Preferences</Text>
                 
+                {/* 2. Plug the global functions into the toggles */}
                 <SettingToggle 
                     icon="translate" 
                     title="English Translation" 
                     subtitle="Show English meanings below Gurmukhi"
                     value={showEnglish} 
-                    onToggle={() => setShowEnglish(!showEnglish)} 
+                    onToggle={toggleEnglish} 
                 />
                 
                 <SettingToggle 
@@ -54,7 +60,7 @@ export default function SettingsScreen({ navigation }: any) {
                     title="English Transliteration" 
                     subtitle="Show pronunciation (e.g., Ik Oankar)"
                     value={showTransliteration} 
-                    onToggle={() => setShowTransliteration(!showTransliteration)} 
+                    onToggle={toggleTransliteration} 
                 />
 
                 <Text style={styles.sectionHeader}>Appearance</Text>
@@ -64,10 +70,9 @@ export default function SettingsScreen({ navigation }: any) {
                     title="Dark Mode" 
                     subtitle="Switch to a dark reading theme"
                     value={darkMode} 
-                    onToggle={() => setDarkMode(!darkMode)} 
+                    onToggle={toggleDarkMode} 
                 />
 
-                {/* Example of a clickable setting rather than a toggle */}
                 <TouchableOpacity style={styles.settingRow} activeOpacity={0.7}>
                     <View style={styles.iconBox}>
                         <MaterialCommunityIcons name="format-font-size-increase" size={24} color={colors.primary} />
