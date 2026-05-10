@@ -1,22 +1,32 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TopBar } from '../components/TopBar';
 import { colors } from '../theme/colors';
 
 export default function LiveGurbaniScreen({ route, navigation }: any) {
+    const insets = useSafeAreaInsets();
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={[
+            styles.container,
+            {
+                paddingTop: insets.top,
+                paddingBottom: insets.bottom,
+                paddingLeft: insets.left,
+                paddingRight: insets.right
+            }
+        ]}>
             {/* The Smart Top Bar ensures the back button works! */}
-            <TopBar 
-                title={route.params.title} 
-                isBack={true} 
-                onLeftPress={() => navigation.goBack()} 
+            <TopBar
+                title={route.params.title}
+                isBack={true}
+                onLeftPress={() => navigation.goBack()}
             />
-            
+
             <View style={styles.content}>
                 <Text style={styles.text}>Live Gurbani Feature Coming Soon</Text>
             </View>
-        </SafeAreaView>
+        </View>
     );
 }
 

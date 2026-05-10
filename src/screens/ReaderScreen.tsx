@@ -1,49 +1,44 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView, TouchableOpacity, LayoutAnimation, Platform, UIManager, ActivityIndicator } from 'react-native';
-import { TopBar } from '../components/TopBar';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, LayoutAnimation, Platform, UIManager, ActivityIndicator } from 'react-native';
 import TrackPlayer from 'react-native-track-player';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { usePlayback } from '../hooks/usePlayback';
 import { colors } from '../theme/colors';
 import { AudioPlayer } from '../components/AudioPlayer';
 
-import { useSettingsStore } from '../store/useSettingsStore';
+// 1. Import all of your self-governing God Components!
+import { ScreenContainer } from '../components/ScreenContainer';
+import { GurbaniText } from '../components/GurbaniText';
+import { TransliterationText } from '../components/TransliterationText';
+import { TranslationText } from '../components/TranslationText';
 
-// A dictionary to map your route IDs to the official GurbaniNow API IDs
-const apiBaniIds: any = {
-    'japji': 1,
-    'jaap': 2,
-    'tavprasad': 3,
-    'choupai': 4,
-    'anand': 5,
-    'rehras': 8,
-    'kirtan': 9,
-    'ardaas': 10, 
+import { useSettingsStore } from '../store/useSettingsStore';
+import { useSQLiteContext } from 'expo-sqlite';
+
+const dbBaniIds: any = {
+    'japji': 1, 'jaap': 2, 'tavprasad': 3, 'choupai': 4,
+    'anand': 5, 'rehras': 8, 'kirtan': 9, 'ardaas': 14,
 };
 
-// CRITICAL: This enables LayoutAnimation on Android for smooth sliding
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
 export default function ReaderScreen({ route, navigation }: any) {
-    // Extract the ID sent from HomeScreen
     const { id, title } = route.params;
 
-    // Pulling global settings from Zustand store
-    const { showEnglish, showTransliteration } = useSettingsStore();
+    // 2. Only pull what this specific screen needs to function
+    const { showEnglish, showTransliteration, darkMode } = useSettingsStore();
+    const db = useSQLiteContext();
 
-    const { isPlaying, playerState } = usePlayback();
+    // Dynamic colors kept only for the Loading/Error text and the line separators
+    const themeTextSub = darkMode ? '#A0A0A0' : colors.textSub;
+    const themeBorder = darkMode ? '#333333' : colors.border;
 
-    // 1. Existing state for player visibility
-    const [showPlayer, setShowPlayer] = useState(true);
-
-    // 2. New states for handling API data
+    const [showPlayer, setShowPlayer] = useState(false);
     const [baniData, setBaniData] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // The function to toggle with a smooth sliding animation
     const togglePlayer = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         setShowPlayer(!showPlayer);
@@ -54,33 +49,35 @@ export default function ReaderScreen({ route, navigation }: any) {
 
         const initializeScreen = async () => {
             try {
-                // START: API FETCH LOGIC
                 setIsLoading(true);
-                const apiId = apiBaniIds[id];
-                const response = await fetch(`https://api.gurbaninow.com/v2/banis/${apiId}`);
-                
-                if (!response.ok) throw new Error("Failed to fetch Bani data");
-                
-                const json = await response.json();
-                
-                // Map the API's nested structure to our simple array structure
-                if (isMounted && json.bani) {
-                    const formattedData = json.bani.map((item: any, index: number) => ({
-                        id: String(index),
-                        // Using optional chaining (?.) to prevent crashes if a line is missing data
-                        gurmukhi: item.line.gurmukhi?.unicode || item.line.gurmukhi?.akhar || '',
-                        transliteration: item.line.transliteration?.english?.text || '',
-                        translation: item.line.translation?.english?.default || '',
+                const numericBaniId = dbBaniIds[id];
+
+                if (!numericBaniId) throw new Error(`No DB ID mapped for route id: ${id}`);
+
+                const result = await db.getAllAsync(`
+                            SELECT 
+                                gurmukhi_unicode AS gurmukhi,
+                                tl_english_text AS transliteration,
+                                trans_english AS translation,
+                                trans_punjabi_unicode AS punjabiTeeka,
+                                tl_devanagari_text AS devanagari
+                            FROM lines 
+                            WHERE bani_id = ? 
+                            ORDER BY line_order ASC
+                        `, [numericBaniId]);
+
+                if (isMounted) {
+                    const formattedData = result.map((item: any, index: any) => ({
+                        id: item.id ? item.id.toString() : index.toString(),
+                        gurmukhi: item.gurmukhi || '',
+                        transliteration: item.transliteration || '',
+                        translation: item.translation || '',
                     }));
                     setBaniData(formattedData);
                 }
-                // END: API FETCH LOGIC
 
-                // START: YOUR EXISTING AUDIO SETUP LOGIC
                 const queue = await TrackPlayer.getQueue();
-
                 if (queue.length === 0 || queue[0].id !== id) {
-                    console.log("Setting up new track...");
                     await TrackPlayer.reset();
                     await TrackPlayer.add({
                         id: id,
@@ -89,8 +86,6 @@ export default function ReaderScreen({ route, navigation }: any) {
                         artist: 'Nitnem Sahib',
                     });
                 }
-                // END: YOUR EXISTING AUDIO SETUP LOGIC
-
             } catch (e: any) {
                 if (isMounted) setError(e.message);
                 console.error("Setup/Fetch error:", e);
@@ -101,136 +96,110 @@ export default function ReaderScreen({ route, navigation }: any) {
 
         initializeScreen();
         return () => { isMounted = false; };
-    }, [id]); // ONLY re-run if the ID changes
+    }, [id]);
 
-    // This function dictates how a single line of Gurbani looks
-    const renderBaniLine = ({ item }: any) => (
-        <View style={styles.lineContainer}>
-            <Text style={styles.gurmukhiText}>{item.gurmukhi}</Text>
-            
-            {/* UPDATED: Only render if both the text exists AND the user's setting is toggled to true */}
-            {showTransliteration && item.transliteration ? (
-                <Text style={styles.transliterationText}>{item.transliteration}</Text>
-            ) : null}
-            
-            {showEnglish && item.translation ? (
-                <Text style={styles.translationText}>{item.translation}</Text>
-            ) : null}
-        </View>
-    );
+    const renderBaniLine = ({ item }: any) => {
+        const cleanGurmukhi = item.gurmukhi.replace(/[;.,]/g, '').replace(/<>/g, 'ੴ');
+        return (
+            <View style={[styles.lineContainer, { borderBottomColor: themeBorder }]}>
+                
+                {/* 3. Pure, clean component renders without any messy inline props! */}
+                <GurbaniText>
+                    {cleanGurmukhi}
+                </GurbaniText>
 
-    // Show Loading Spinner while fetching data
+                {showTransliteration && item.transliteration ? (
+                    <TransliterationText>
+                        {item.transliteration}
+                    </TransliterationText>
+                ) : null}
+
+                {showEnglish && item.translation ? (
+                    <TranslationText>
+                        {item.translation}
+                    </TranslationText>
+                ) : null}
+                
+            </View>
+        );
+    };
+
     if (isLoading) {
         return (
-            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={{ marginTop: 10, color: colors.textMuted }}>Loading {title}...</Text>
-            </SafeAreaView>
+            <ScreenContainer title={title} isBack={true} onLeftPress={() => navigation.goBack()}>
+                <View style={styles.centerContent}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                    <Text style={{ marginTop: 10, color: themeTextSub }}>Loading {title}...</Text>
+                </View>
+            </ScreenContainer>
         );
     }
 
-    // Show Error message if offline or API fails
     if (error) {
         return (
-            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <MaterialCommunityIcons name="wifi-off" size={40} color={colors.textMuted} />
-                <Text style={{ marginTop: 10, color: colors.textMuted }}>Unable to load Gurbani.</Text>
-                <Text style={{ fontSize: 12, color: 'red', marginTop: 5 }}>{error}</Text>
-            </SafeAreaView>
+            <ScreenContainer title={title} isBack={true} onLeftPress={() => navigation.goBack()}>
+                <View style={styles.centerContent}>
+                    <MaterialCommunityIcons name="alert-circle-outline" size={40} color={themeTextSub} />
+                    <Text style={{ marginTop: 10, color: themeTextSub }}>Unable to load Gurbani.</Text>
+                    <Text style={{ fontSize: 12, color: 'red', marginTop: 5 }}>{error}</Text>
+                </View>
+            </ScreenContainer>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
-            <TopBar 
-                title={title} 
-                isBack={true} 
-                onLeftPress={() => navigation.goBack()} 
-            />
-            
+        <ScreenContainer title={title} isBack={true} onLeftPress={() => navigation.goBack()}>
             <FlatList
-                // Pass the fetched state data here
                 data={baniData}
                 keyExtractor={(item) => item.id}
                 renderItem={renderBaniLine}
-                // Performance boosts for rendering large lists of text
                 initialNumToRender={15}
                 maxToRenderPerBatch={20}
                 windowSize={5}
-                // Dynamically adjust bottom padding so text doesn't hide behind the player
-                contentContainerStyle={[styles.listContent, { paddingBottom: showPlayer ? 240 : 100 }]}
+                contentContainerStyle={{ paddingBottom: showPlayer ? 240 : 100 }}
             />
 
-            <Text style={{ fontSize: 10, color: 'red' }}>
-                Raw State: {playerState} | isPlaying: {JSON.stringify(isPlaying)}
-            </Text>
-
-            {/* THE SEEK BUTTON: Shows only when player is hidden */}
             {!showPlayer && (
                 <TouchableOpacity style={styles.floatingMusicBtn} onPress={togglePlayer}>
                     <MaterialCommunityIcons name="music-note" size={28} color="white" />
                 </TouchableOpacity>
             )}
 
-            {/* Floating Player at the bottom */}
             {showPlayer && (
                 <View style={styles.bottomPlayerContainer}>
                     <AudioPlayer onHide={togglePlayer} />
                 </View>
             )}
-
-        </SafeAreaView>
+        </ScreenContainer>
     );
 }
 
+// 4. Styles are now incredibly small. The text styling debt is gone!
 const styles = StyleSheet.create({
-    container: {
+    centerContent: {
         flex: 1,
-        backgroundColor: colors.background,
-    },
-    listContent: {
-        // Removed fixed paddingBottom from here since it's handled dynamically above
+        justifyContent: 'center',
+        alignItems: 'center'
     },
     lineContainer: {
         paddingVertical: 16,
         paddingHorizontal: 20,
         borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-    },
-    gurmukhiText: {
-        fontFamily: 'GurbaniLipi',
-        fontSize: 24,
-        color: colors.primary, // Using the Saffron color for the main Gurbani
-        textAlign: 'center',
-        marginBottom: 8,
-        fontWeight: '600',
-    },
-    transliterationText: {
-        fontSize: 16,
-        color: colors.textMain,
-        textAlign: 'center',
-        fontStyle: 'italic',
-        marginBottom: 4,
-    },
-    translationText: {
-        fontSize: 14,
-        color: colors.textSub, // A softer gray for the English translation
-        textAlign: 'center',
     },
     bottomPlayerContainer: {
         position: 'absolute',
-        bottom: 0,
+        bottom: 20,
         left: 0,
         right: 0,
     },
     floatingMusicBtn: {
         position: 'absolute',
-        bottom: 30,
+        bottom: 50,
         right: 20,
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: colors.primary, // Uses your theme's primary color
+        backgroundColor: colors.primary,
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 8,
