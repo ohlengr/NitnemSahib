@@ -30,7 +30,7 @@ export const BaniCard = ({ item, onPress }: BaniCardProps) => {
             onPress={onPress}
         >
             <View style={[styles.iconContainer, { backgroundColor: iconBgColor }]}>
-                <MaterialCommunityIcons name={item.icon} size={28} color={colors.primary} />
+                <MaterialCommunityIcons name={item.icon} size={28} color={darkMode ? '#FFFFFF' : colors.primary} />
             </View>
 
             <View style={styles.textContainer}>

@@ -1,33 +1,36 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Switch } from 'react-native';
 import { DrawerContentScrollView, DrawerItemList } from '@react-navigation/drawer';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../theme/colors';
 
+// IMPORT YOUR GLOBAL STORE HERE
+import { useSettingsStore } from '../store/useSettingsStore'; // Adjust path if needed
+
 export const CustomDrawer = (props: any) => {
-    // Note: Later, you can hook this up to your app's global state (like Context or Redux)
-    const [isDarkMode, setIsDarkMode] = useState(false);
+    // 1. Pull the global state from your specific Zustand store
+    const { darkMode } = useSettingsStore();
 
-    const toggleTheme = () => setIsDarkMode(!isDarkMode);
+    // 2. Dynamic background and text colors based on global theme
+    const bgColor = darkMode ? '#121212' : colors.background;
+    const textColor = darkMode ? '#FFFFFF' : colors.textMain;
+    const subTextColor = darkMode ? '#AAAAAA' : colors.textSub;
+    const borderColor = darkMode ? '#333333' : colors.border;
 
-    // Reusable component for the info links
+    // 3. Reusable component for the info links
     const CustomDrawerItem = ({ icon, label, onPress }: { icon: any, label: string, onPress: () => void }) => (
         <TouchableOpacity style={styles.customItem} onPress={onPress}>
-            <MaterialCommunityIcons name={icon} size={24} color={isDarkMode ? '#AAAAAA' : colors.textSub} />
-            <Text style={[styles.customItemText, { color: isDarkMode ? '#FFFFFF' : colors.textMain }]}>{label}</Text>
+            <MaterialCommunityIcons name={icon} size={24} color={subTextColor} />
+            <Text style={[styles.customItemText, { color: textColor }]}>{label}</Text>
         </TouchableOpacity>
     );
-
-    // Dynamic background based on theme
-    const bgColor = isDarkMode ? '#121212' : colors.background;
-    const textColor = isDarkMode ? '#FFFFFF' : colors.textMain;
 
     return (
         <View style={{ flex: 1, backgroundColor: bgColor }}>
             <DrawerContentScrollView {...props} contentContainerStyle={{ paddingTop: 0 }}>
                 
-                {/* 1. TOP HEADER (App Branding) */}
-                <View style={styles.header}>
+                {/* TOP HEADER (App Branding) */}
+                <View style={[styles.header, { borderBottomColor: borderColor }]}>
                     <View style={styles.iconContainer}>
                         <MaterialCommunityIcons name="khanda" size={40} color="white" />
                     </View>
@@ -35,15 +38,15 @@ export const CustomDrawer = (props: any) => {
                     <Text style={styles.version}>Version 1.0.0</Text>
                 </View>
 
-                {/* 2. MAIN NAVIGATION (The Home button from App.tsx) */}
+                {/* MAIN NAVIGATION */}
                 <View style={styles.drawerListWrapper}>
                     <DrawerItemList {...props} />
                 </View>
 
-                {/* 3. INFO PAGES */}
-                <View style={[styles.divider, { backgroundColor: isDarkMode ? '#333' : colors.border }]} />
+                {/* INFO PAGES */}
+                <View style={[styles.divider, { backgroundColor: borderColor }]} />
                 <View style={styles.infoSection}>
-                    <Text style={styles.sectionTitle}>Information</Text>
+                    <Text style={[styles.sectionTitle, { color: subTextColor }]}>Information</Text>
                     <CustomDrawerItem 
                         icon="shield-check-outline" 
                         label="Privacy Policy" 
@@ -68,22 +71,12 @@ export const CustomDrawer = (props: any) => {
 
             </DrawerContentScrollView>
 
-            {/* 4. BOTTOM FOOTER (Dark Mode Toggle) */}
-            <View style={[styles.footer, { borderTopColor: isDarkMode ? '#333' : colors.border }]}>
-                <View style={styles.themeRow}>
-                    <MaterialCommunityIcons 
-                        name={isDarkMode ? "moon-waning-crescent" : "white-balance-sunny"} 
-                        size={24} 
-                        color={textColor} 
-                    />
-                    <Text style={[styles.themeText, { color: textColor }]}>Dark Mode</Text>
-                    <Switch
-                        trackColor={{ false: "#D3D3D3", true: colors.primaryLight }}
-                        thumbColor={isDarkMode ? colors.primary : "#f4f3f4"}
-                        onValueChange={toggleTheme}
-                        value={isDarkMode}
-                    />
-                </View>
+            {/* BOTTOM FOOTER (Dark Mode Toggle + Copyright) */}
+            <View style={[styles.footer, { borderTopColor: borderColor }]}>
+                {/* Copyright */}
+                <Text style={[styles.copyrightText, { color: subTextColor }]}>
+                    © {new Date().getFullYear()} ohlengr.com
+                </Text>
             </View>
         </View>
     );
@@ -92,16 +85,15 @@ export const CustomDrawer = (props: any) => {
 const styles = StyleSheet.create({
     header: {
         padding: 20,
-        paddingTop: 50, // Accounts for phone status bar
+        paddingTop: 50, 
         alignItems: 'center',
         borderBottomWidth: 1,
-        borderBottomColor: 'rgba(0,0,0,0.05)',
     },
     iconContainer: {
         width: 80,
         height: 80,
         borderRadius: 20,
-        backgroundColor: colors.primary, // Saffron background for the icon
+        backgroundColor: colors.primary, 
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 15,
@@ -114,7 +106,7 @@ const styles = StyleSheet.create({
     appName: {
         fontSize: 22,
         fontWeight: 'bold',
-        fontFamily: 'GurbaniLipi', // Optional: use your custom font here
+        fontFamily: 'GurbaniLipi', 
     },
     version: {
         fontSize: 12,
@@ -135,7 +127,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 13,
         fontWeight: '600',
-        color: colors.textMuted,
         marginLeft: 15,
         marginBottom: 10,
         textTransform: 'uppercase',
@@ -155,18 +146,24 @@ const styles = StyleSheet.create({
     },
     footer: {
         padding: 20,
-        paddingBottom: 30, // Breathing room at the bottom
+        paddingBottom: 30, 
         borderTopWidth: 1,
     },
     themeRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        marginBottom: 20, // Adds breathing room above the copyright
     },
     themeText: {
         flex: 1,
         fontSize: 16,
         fontWeight: '500',
         marginLeft: 15,
+    },
+    copyrightText: {
+        fontSize: 14,
+        fontWeight: '500',
+        textAlign: 'center',
     }
 });
