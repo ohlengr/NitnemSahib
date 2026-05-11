@@ -16,7 +16,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 const dbBaniIds: any = {
     'japji': 1, 'jaap': 2, 'tavprasad': 3, 'choupai': 4,
-    'anand': 5, 'rehras': 8, 'kirtan': 9, 'ardaas': 14,
+    'anand': 5, 'rehras': 7, 'kirtan': 11, 'ardaas': 14,
 };
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {

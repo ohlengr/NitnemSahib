@@ -97,8 +97,8 @@ export default function App() {
   // 2. The Main App Navigator
   return (
     <SQLiteProvider
-      databaseName="nitnem.db"
-      assetSource={{ assetId: require('./src/assets/nitnem_complete.sqlite') }}
+      databaseName="nitnem_sahib.db"
+      assetSource={{ assetId: require('./src/assets/nitnem.sqlite') }}
     >
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
