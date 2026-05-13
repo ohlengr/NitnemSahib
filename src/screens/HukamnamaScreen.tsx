@@ -17,8 +17,8 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Encode the URL properly to handle the space (%20) safely
-const DAILY_AUDIO_URL = 'https://sgpc.net/hukamnama/jpeg%20hukamnama/hukamnama.mp3';
+    // Encode the URL properly to handle the space (%20) safely
+    const DAILY_AUDIO_URL = 'https://hs.sgpc.net/uploadhukamnama/hukamnama.mp3';
 
 export default function HukamnamaScreen({ navigation }: any) {
     const { showEnglish, showTransliteration, darkMode } = useSettingsStore();
