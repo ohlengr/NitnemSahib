@@ -7,7 +7,7 @@ import { ScreenContainer } from '../components/ScreenContainer';
 import { BaniCard } from '../components/BaniCard';
 
 const banis = [
-    { id: 'simran', title: 'ਨਾਮ ਸਿਮਰਨ', subtitle: 'Meditation', icon: 'meditation' },
+    // { id: 'simran', title: 'ਨਾਮ ਸਿਮਰਨ', subtitle: 'Meditation', icon: 'meditation' },
     { id: 'hukamnama', title: 'ਹੁਕਮਨਾਮਾ ਸਾਹਿਬ', subtitle: 'Daily Hukamnama', icon: 'khanda' },
     { id: 'live_kirtan', title: 'ਲਾਈਵ ਕੀਰਤਨ', subtitle: 'Live Darbar Sahib', icon: 'radio' },
     { id: 'japji', title: 'ਜਪੁਜੀ ਸਾਹਿਬ', subtitle: 'Morning Prayer', icon: 'khanda' },

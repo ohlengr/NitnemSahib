@@ -17,8 +17,8 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
     UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-    // Encode the URL properly to handle the space (%20) safely
-    const DAILY_AUDIO_URL = 'https://hs.sgpc.net/uploadhukamnama/hukamnama.mp3';
+// Your actual live PHP API URL
+const PHP_API_URL = 'https://api.ohlengr.com/';
 
 export default function HukamnamaScreen({ navigation }: any) {
     const { showEnglish, showTransliteration, darkMode } = useSettingsStore();
@@ -32,9 +32,10 @@ export default function HukamnamaScreen({ navigation }: any) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     
-    // Audio Validation State
+    // Audio & Sync States
     const [audioReady, setAudioReady] = useState(false);
     const [showPlayer, setShowPlayer] = useState(false);
+    const [isTextLagging, setIsTextLagging] = useState(false);
 
     const togglePlayer = () => {
         if (!audioReady) return; 
@@ -57,20 +58,16 @@ export default function HukamnamaScreen({ navigation }: any) {
             try {
                 setIsLoading(true);
 
-                // --- 1. FETCH TEXT DATA ---
-                const response = await fetch('https://api.gurbaninow.com/v2/hukamnama/today');
-                if (!response.ok) throw new Error('Could not fetch text data');
-                const json = await response.json();
+                // --- 1. FETCH TEXT DATA (GurbaniNow) ---
+                const textRes = await fetch('https://api.gurbaninow.com/v2/hukamnama/today');
+                const textJson = await textRes.json();
+                let textGregorian = null;
 
-                if (isMounted && json.hukamnama) {
-                    if (json.date && json.date.gregorian) {
-                        const g = json.date.gregorian;
-                        setHukamDate(`${g.day}, ${g.date}-${g.month}-${g.year}`);
-                    } else {
-                        setHukamDate("Today's Hukamnama");
-                    }
+                if (isMounted && textJson.hukamnama) {
+                    textGregorian = textJson.date.gregorian;
+                    setHukamDate(`${textGregorian.day}, ${textGregorian.date}-${textGregorian.month}-${textGregorian.year}`);
 
-                    const formattedData = json.hukamnama.map((item: any, index: number) => ({
+                    const formattedData = textJson.hukamnama.map((item: any, index: number) => ({
                         id: String(index),
                         gurmukhi: item.line.gurmukhi?.unicode || '',
                         transliteration: item.line.transliteration?.english?.text || '',
@@ -79,30 +76,47 @@ export default function HukamnamaScreen({ navigation }: any) {
                     setHukamnamaData(formattedData);
                 }
 
-                // --- 2. STRICT AUDIO VALIDATION ---
-                try {
-                    // Pre-flight check: Ping the server to see if the file actually exists and isn't corrupt
-                    const audioCheck = await fetch(DAILY_AUDIO_URL, { method: 'HEAD' });
+                // --- 2. FETCH AUDIO (Your API) ---
+                const audioRes = await fetch(PHP_API_URL);
+                const audioJson = await audioRes.json();
+
+                if (isMounted && audioJson.success) {
                     
-                    // If the server returns a 200 OK, the file is safe to load
-                    if (audioCheck.ok) {
-                        await TrackPlayer.reset();
-                        await TrackPlayer.add({
-                            id: 'daily_hukamnama',
-                            url: DAILY_AUDIO_URL,
-                            title: "Today's Hukamnama",
-                            artist: 'Sri Darbar Sahib, Amritsar',
-                        });
-                        if (isMounted) setAudioReady(true);
-                    } else {
-                        // The file is corrupted or returning a 404 Not Found
-                        console.warn("SGPC Audio is corrupt or down today. Hiding player.");
-                        if (isMounted) setAudioReady(false);
+                    // --- 3. STRICT SERVER-TO-SERVER SYNC CHECK ---
+                    if (textGregorian && audioJson.lastUpdated) {
+                        const audioDateObj = new Date(audioJson.lastUpdated);
+                        
+                        // Extract exact day/month/year from the Audio server
+                        const audioDay = audioDateObj.getDate();
+                        const audioMonth = audioDateObj.getMonth() + 1; 
+                        const audioYear = audioDateObj.getFullYear();
+
+                        // Extract exact numbers from GurbaniNow API
+                        // Note: We use 'monthno' instead of 'month' and wrap in Number() for safety
+                        const textDay = Number(textGregorian.date);
+                        const textMonth = Number(textGregorian.monthno); 
+                        const textYear = Number(textGregorian.year);
+
+                        // Compare the Numbers exactly
+                        if (
+                            textDay !== audioDay || 
+                            textMonth !== audioMonth || 
+                            textYear !== audioYear
+                        ) {
+                            setIsTextLagging(true); // Dates do not match, show badge
+                        } else {
+                            setIsTextLagging(false); // Dates match exactly, hide badge
+                        }
                     }
-                } catch (audioErr) {
-                    // Network failed entirely
-                    console.warn("Could not reach SGPC Audio Server:", audioErr);
-                    if (isMounted) setAudioReady(false);
+
+                    await TrackPlayer.reset();
+                    await TrackPlayer.add({
+                        id: 'daily_hukamnama',
+                        url: audioJson.links.dailyHukamnama,
+                        title: "Today's Hukamnama",
+                        artist: 'Sri Darbar Sahib, Amritsar',
+                    });
+                    setAudioReady(true);
                 }
 
             } catch (e: any) {
@@ -133,6 +147,16 @@ export default function HukamnamaScreen({ navigation }: any) {
 
     const renderHeader = () => (
         <View style={styles.headerContainer}>
+            {/* Sync Alert Badge - Now controlled entirely by server differences */}
+            {isTextLagging && (
+                <View style={styles.syncAlert}>
+                    <MaterialCommunityIcons name="cached" size={16} color="#E67E22" />
+                    <Text style={styles.syncAlertText}>
+                        AUDIO UPDATED • TEXT SYNCING...
+                    </Text>
+                </View>
+            )}
+
             <View style={[styles.infoCard, { backgroundColor: surfaceColor, shadowColor: darkMode ? '#000' : colors.textSub }]}>
                 <View style={styles.infoRow}>
                     <View style={styles.iconCircle}>
@@ -156,18 +180,6 @@ export default function HukamnamaScreen({ navigation }: any) {
             <ScreenContainer title="Hukamnama Sahib" isBack={true} onLeftPress={handleBack}>
                 <View style={styles.centerContent}>
                     <ActivityIndicator size="large" color={colors.primary} />
-                    <Text style={{ marginTop: 10, color: themeTextSub }}>Fetching Daily Hukamnama...</Text>
-                </View>
-            </ScreenContainer>
-        );
-    }
-
-    if (error) {
-        return (
-            <ScreenContainer title="Hukamnama Sahib" isBack={true} onLeftPress={handleBack}>
-                <View style={styles.centerContent}>
-                    <MaterialCommunityIcons name="alert-circle-outline" size={40} color={themeTextSub} />
-                    <Text style={{ marginTop: 10, color: themeTextSub }}>Unable to load content.</Text>
                 </View>
             </ScreenContainer>
         );
@@ -180,14 +192,10 @@ export default function HukamnamaScreen({ navigation }: any) {
                 keyExtractor={(item) => item.id}
                 ListHeaderComponent={renderHeader}
                 renderItem={renderLine}
-                initialNumToRender={15}
-                maxToRenderPerBatch={20}
-                windowSize={5}
                 contentContainerStyle={{ paddingBottom: showPlayer ? 240 : 100 }}
                 showsVerticalScrollIndicator={false}
             />
 
-            {/* ONLY SHOW BUTTON IF PRE-FLIGHT CHECK PASSED */}
             {audioReady && !showPlayer && (
                 <TouchableOpacity style={styles.floatingMusicBtn} onPress={togglePlayer}>
                     <MaterialCommunityIcons name="music-note" size={28} color="white" />
@@ -204,20 +212,26 @@ export default function HukamnamaScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-    centerContent: {
-        flex: 1,
-        justifyContent: 'center',
+    centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+    lineContainer: { paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1 },
+    headerContainer: { paddingHorizontal: 20, paddingTop: 15, paddingBottom: 10 },
+    syncAlert: {
+        flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: '#FFF3E0',
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#FFE0B2',
     },
-    lineContainer: {
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        borderBottomWidth: 1,
-    },
-    headerContainer: {
-        paddingHorizontal: 20,
-        paddingTop: 20,
-        paddingBottom: 10,
+    syncAlertText: {
+        color: '#E67E22',
+        fontSize: 11,
+        fontWeight: 'bold',
+        marginLeft: 6,
+        letterSpacing: 0.5,
     },
     infoCard: {
         flexDirection: 'row',
@@ -225,14 +239,8 @@ const styles = StyleSheet.create({
         padding: 15,
         borderRadius: 16,
         elevation: 4,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
     },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
+    infoRow: { flexDirection: 'row', alignItems: 'center' },
     iconCircle: {
         width: 46,
         height: 46,
@@ -242,20 +250,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: 15,
     },
-    titleText: { 
-        fontSize: 16, 
-        fontWeight: 'bold',
-    },
-    subtitleText: { 
-        fontSize: 13, 
-        marginTop: 2,
-    },
-    bottomPlayerContainer: {
-        position: 'absolute',
-        bottom: 20,
-        left: 0,
-        right: 0,
-    },
+    titleText: { fontSize: 16, fontWeight: 'bold' },
+    subtitleText: { fontSize: 13, marginTop: 2 },
+    bottomPlayerContainer: { position: 'absolute', bottom: 20, left: 0, right: 0 },
     floatingMusicBtn: {
         position: 'absolute',
         bottom: 50,
@@ -267,9 +264,5 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
     }
 });
